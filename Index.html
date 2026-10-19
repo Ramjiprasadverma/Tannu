@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Notes</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',system-ui,sans-serif; }
+  :root{
+    --bg1:#12071f; --bg2:#1e0b38; --purple:#8b5cf6; --purple2:#a855f7;
+    --pink:#ec4899; --text:#e9e4f5; --muted:#9d8fc0;
+  }
+  body{ background:var(--bg1); color:var(--text); min-height:100vh; overflow:hidden; }
+
+  /* ---------- DECOY LANDING ---------- */
+  #landing{ height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; }
+  #landing h1{ font-weight:300; color:var(--muted); letter-spacing:2px; font-size:22px; }
+  #landing p{ color:#5b4f78; font-size:14px; }
+  /* छिपा हुआ आइकन — कोने में लगभग अदृश्य */
+  #hiddenHeart{
+    position:fixed; bottom:18px; right:18px; width:26px; height:26px;
+    opacity:.18; cursor:pointer; border:none; background:none; transition:opacity .4s;
+  }
+  #hiddenHeart:hover{ opacity:.85; }
+  #hiddenHeart svg{ width:100%; height:100%; fill:var(--purple); filter:drop-shadow(0 0 6px var(--purple)); }
+
+  /* ---------- PASSWORD GATE ---------- */
+  .overlay{
+    position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+    background:rgba(10,4,22,.92); backdrop-filter:blur(8px); z-index:50;
+  }
+  .overlay.active{ display:flex; }
+  .modal{
+    background:linear-gradient(160deg,#22103d,#160a2b);
+    border:1px solid rgba(139,92,246,.35); border-radius:18px;
+    padding:34px 30px; width:320px; text-align:center;
+    box-shadow:0 0 60px rgba(139,92,246,.25);
+  }
+  .modal h2{ font-size:20px; margin-bottom:6px; }
+  .modal .sub{ color:var(--muted); font-size:13px; margin-bottom:20px; }
+  .modal input{
+    width:100%; padding:12px 14px; border-radius:10px; border:1px solid #3b2a5e;
+    background:#150a28; color:var(--text); font-size:15px; outline:none; text-align:center;
+    letter-spacing:3px;
+  }
+  .modal input:focus{ border-color:var(--purple); box-shadow:0 0 12px rgba(139,92,246,.35); }
+  .modal button.main{
+    margin-top:16px; width:100%; padding:12px; border:none; border-radius:10px;
+    background:linear-gradient(90deg,var(--purple),var(--pink)); color:#fff;
+    font-size:15px; font-weight:600; cursor:pointer;
+  }
+  .modal button.main:hover{ filter:brightness(1.15); }
+  #gateErr{ color:#f87171; font-size:13px; margin-top:12px; min-height:18px; }
+  .shake{ animation:shake .4s; }
+  @keyframes shake{ 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+
+  /* ---------- CHAT ---------- */
+  #chatApp{ display:none; height:100vh; flex-direction:column; max-width:520px; margin:0 auto; }
+  #chatApp.active{ display:flex; }
+  header{
+    display:flex; align-items:center; gap:12px; padding:14px 18px;
+    background:linear-gradient(90deg,#1c0d33,#160a28); border-bottom:1px solid #2c1a4d;
+  }
+  .avatar{
+    width:44px; height:44px; border-radius:50%;
+    background:linear-gradient(135deg,var(--purple),var(--pink));
+    display:flex; align-items:center; justify-content:center; font-size:20px;
+  }
+  .peer-info{ flex:1; }
+  .peer-info .name{ font-weight:600; font-size:16px; }
+  #peerStatus{ font-size:12px; color:var(--muted); }
+  #peerStatus.online{ color:#4ade80; }
+  #peerStatus.typing{ color:var(--purple2); }
+  .icon-btn{
+    background:#241243; border:1px solid #3b2a5e; color:var(--text); width:42px; height:42px;
+    border-radius:50%; font-size:18px; cursor:pointer; transition:.2s;
+  }
+  .icon-btn:hover{ background:var(--purple); box-shadow:0 0 14px rgba(139,92,246,.5); }
+
+  #msgs{
+    flex:1; overflow-y:auto; padding:18px 14px; display:flex; flex-direction:column; gap:10px;
+    background:radial-gradient(ellipse at 50% 0%, #1d0d36 0%, var(--bg1) 70%);
+  }
+  .msg{
+    max-width:75%; padding:10px 14px; border-radius:16px; font-size:15px;
+    line-height:1.45; position:relative; animation:pop .25s ease;
+    word-break:break-word;
+  }
+  @keyframes pop{ from{opacity:0; transform:translateY(8px) scale(.96)} to{opacity:1; transform:none} }
+  .msg.me{
+    align-self:flex-end; background:linear-gradient(135deg,var(--purple),var(--purple2));
+    border-bottom-right-radius:4px; box-shadow:0 3px 14px rgba(139,92,246,.3);
+  }
+  .msg.them{
+    align-self:flex-start; background:#241543; border:1px solid #36245e;
+    border-bottom-left-radius:4px;
+  }
+  .msg .time{ display:block; font-size:10px; opacity:.6; margin-top:4px; text-align:right; }
+
+  #typingBar{
+    display:none; padding:0 18px 6px; color:var(--purple2); font-size:13px; font-style:italic;
+  }
+  #typingBar.active{ display:block; }
+
+  footer{ display:flex; gap:8px; padding:12px 14px; background:#160a28; border-top:1px solid #2c1a4d; align-items:center; }
+  footer input{
+    flex:1; padding:12px 16px; border-radius:24px; border:1px solid #3b2a5e;
+    background:#150a28; color:var(--text); font-size:15px; outline:none;
+  }
+  footer input:focus{ border-color:var(--purple); }
+  #sendBtn{
+    width:46px; height:46px; border:none; border-radius:50%; font-size:19px; cursor:pointer;
+    background:linear-gradient(135deg,var(--purple),var(--pink)); color:#fff;
+    box-shadow:0 3px 16px rgba(236,72,153,.4); transition:.2s;
+  }
+  #sendBtn:hover{ transform:scale(1.08); }
+
+  /* फ्लोटिंग हार्ट्स */
+  .float-heart{ position:fixed; bottom:-30px; pointer-events:none; animation:rise linear forwards; z-index:0; opacity:.5; }
+  @keyframes rise{ to{ transform:translateY(-110vh) rotate(25deg); opacity:0; } }
+
+  /* ---------- CALL ---------- */
+  #callOverlay{ z-index:60; background:rgba(8,3,18,.96); flex-direction:column; }
+  #callOverlay.active{ display:flex; }
+  #callStage{ flex:1; display:flex; align-items:center; justify-content:center; position:relative; }
+  #remotePlaceholder{
+    width:min(78vw,340px); height:min(60vh,420px); border-radius:20px;
+    background:#1c0d33; border:1px solid #3b2a5e;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+  }
+  #remotePlaceholder .big-avatar{ font-size:64px; }
+  #remotePlaceholder p{ color:var(--muted); font-size:14px; }
+  #localVideo{
+    position:absolute; bottom:110px; right:16px; width:110px; height:150px;
+    border-radius:12px; object-fit:cover; border:2px solid var(--purple);
+    background:#000; display:none; transform:scaleX(-1);
+  }
+  #callTimer{ position:absolute; top:24px; left:50%; transform:translateX(-50%);
+    color:#4ade80; font-size:15px; letter-spacing:1px; }
+  #callControls{
+    display:flex; gap:18px; justify-content:center; padding:26px 0 40px;
+  }
+  .ctrl{
+    width:58px; height:58px; border-radius:50%; border:none; font-size:22px; cursor:pointer;
+    background:#2a1750; color:#fff; transition:.2s; border:1px solid #453073;
+  }
+  .ctrl:hover{ filter:brightness(1.2); }
+  .ctrl.off{ background:#451a2a; border-color:#7a2c4a; }
+  #endCall{ background:linear-gradient(135deg,#ef4444,#dc2626); width:66px; height:66px; }
+  #incomingCall .peer-name{ font-size:26px; margin-bottom:4px; }
+  .pulse{ animation:pulse 1.2s infinite; }
+  @keyframes pulse{ 0%,100%{box-shadow:0 0 0 0 rgba(139,92,246,.5)} 50%{box-shadow:0 0 0 16px rgba(139,92,246,0)} }
+</style>
+<base target="_blank">
+</head>
+<body>
+
+<!-- ===== डिकॉय लैंडिंग पेज ===== -->
+<div id="landing">
+  <h1>✦ My Notes</h1>
+  <p>कुछ नहीं यहाँ... सिर्फ नोट्स।</p>
+</div>
+<button id="hiddenHeart" title=" ">
+  <svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.9-10-9.2C.3 8.6 2 4.5 6 4c2.3-.3 4.3 1 6 3.2C13.7 5 15.7 3.7 18 4c4 .5 5.7 4.6 4 7.8C19.5 16.1 12 21 12 21z"/></svg>
+</button>
+
+<!-- ===== पासवर्ड गेट ===== -->
+<div class="overlay" id="gate">
+  <div class="modal" id="gateModal">
+    <h2>🔒 Private Access</h2>
+    <p class="sub">केवल दो लोगों के लिए</p>
+    <input type="password" id="codeInput" placeholder="••••••••" autocomplete="off">
+    <button class="main" id="unlockBtn">Unlock 💜</button>
+    <p id="gateErr"></p>
+  </div>
+</div>
+
+<!-- ===== चैट ऐप ===== -->
+<div id="chatApp">
+  <header>
+    <div class="avatar" id="peerAvatar">💜</div>
+    <div class="peer-info">
+      <div class="name" id="peerName">Partner</div>
+      <div id="peerStatus">ऑफलाइन</div>
+    </div>
+    <button class="icon-btn" id="audioCallBtn" title="ऑडियो कॉल">📞</button>
+    <button class="icon-btn" id="videoCallBtn" title="वीडियो कॉल">🎥</button>
+  </header>
+  <div id="msgs"></div>
+  <div id="typingBar">Partner टाइप कर रहे हैं…</div>
+  <footer>
+    <input id="msgInput" placeholder="मैसेज लिखो… 💌" autocomplete="off">
+    <button id="sendBtn">➤</button>
+  </footer>
+</div>
+
+<!-- ===== इनकमिंग कॉल ===== -->
+<div class="overlay" id="incomingCall">
+  <div class="modal pulse">
+    <div class="peer-name" id="callerName">💜 Partner</div>
+    <p class="sub" id="callTypeLabel">इनकमिंग ऑडियो कॉल…</p>
+    <div style="display:flex; gap:12px;">
+      <button class="main" id="acceptBtn" style="background:linear-gradient(90deg,#22c55e,#16a34a); margin-top:6px;">✔ Accept</button>
+      <button class="main" id="declineBtn" style="background:linear-gradient(90deg,#ef4444,#dc2626); margin-top:6px;">✖ Decline</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== कॉल स्क्रीन ===== -->
+<div class="overlay" id="callOverlay">
+  <div id="callTimer"></div>
+  <div id="callStage">
+    <div id="remotePlaceholder">
+      <div class="big-avatar">💜</div>
+      <p id="remoteNote">कनेक्ट हो रहा है…</p>
+    </div>
+    <video id="localVideo" autoplay muted playsinline></video>
+  </div>
+  <div id="callControls">
+    <button class="ctrl" id="micBtn" title="माइक">🎙️</button>
+    <button class="ctrl" id="camBtn" title="कैमरा">📷</button>
+    <button class="ctrl" id="endCall" title="कॉल खत्म">📵</button>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   प्राइवेसी: कोई localStorage, कोई DB, कोई cookie — सब कुछ RAM में।
+   लोकल डेमो: BroadcastChannel दो टैब्स को जोड़ता है। पेज बंद = सब मिट।
+   ===================================================================== */
+
+// ----- दो एक्सेस कोड (अपने हिसाब से बदल लेना) -----
+const CODES = {
+  'DIL123':  { id:'A', name:'Rahul 💙' },
+  'JANU456': { id:'B', name:'Priya 💗' },
+};
+
+const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('couple-room-v1') : null;
+let me = null, peerOnline = false, typingTimer = null, callTimerInt = null, callSecs = 0;
+let localStream = null, micOn = true, camOn = true, incomingCall = null;
+
+const $ = id => document.getElementById(id);
+
+// ---------- गेट ----------
+$('hiddenHeart').onclick = () => { $('gate').classList.add('active'); $('codeInput').focus(); };
+function tryUnlock(){
+  const code = $('codeInput').value.trim();
+  const u = CODES[code];
+  if(!u){
+    $('gateErr').textContent = '❌ एक्सेस अस्वीकृत';
+    $('gateModal').classList.add('shake');
+    setTimeout(()=>$('gateModal').classList.remove('shake'),450);
+    return;
+  }
+  me = u;
+  $('gate').classList.remove('active');
+  enterChat();
+}
+$('unlockBtn').onclick = tryUnlock;
+$('codeInput').addEventListener('keydown', e => { if(e.key==='Enter') tryUnlock(); });
+
+// ---------- चैट एंट्री ----------
+function enterChat(){
+  const peer = Object.values(CODES).find(c => c.id !== me.id);
+  $('peerName').textContent = peer.name;
+  $('chatApp').classList.add('active');
+  $('landing').style.display = 'none';
+  sendSys({ t:'hello', name:me.name });
+  spawnHearts();
+}
+
+// ---------- मैसेजिंग (सिर्फ मेमोरी) ----------
+function addMsg(text, mine){
+  const d = document.createElement('div');
+  d.className = 'msg ' + (mine ? 'me' : 'them');
+  const t = new Date().toLocaleTimeString('hi-IN',{hour:'2-digit',minute:'2-digit'});
+  d.innerHTML = `${escapeHtml(text)}<span class="time">${t}</span>`;
+  $('msgs').appendChild(d);
+  $('msgs').scrollTop = $('msgs').scrollHeight;
+}
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function sendMsg(){
+  const v = $('msgInput').value.trim();
+  if(!v || !me) return;
+  addMsg(v, true);
+  sendSys({ t:'msg', from:me.id, text:v });
+  $('msgInput').value = '';
+  sendSys({ t:'typing', on:false });
+}
+$('sendBtn').onclick = sendMsg;
+$('msgInput').addEventListener('keydown', e => { if(e.key==='Enter') sendMsg(); });
+$('msgInput').addEventListener('input', () => {
+  if(!me) return;
+  sendSys({ t:'typing', on:true });
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(()=> sendSys({ t:'typing', on:false }), 1200);
+});
+
+// ---------- BroadcastChannel सिग्नलिंग ----------
+function sendSys(o){ if(bc) bc.postMessage(o); }
+if(bc) bc.onmessage = ev => {
+  const m = ev.data;
+  switch(m.t){
+    case 'hello':
+      if(m.name !== me.name){ peerOnline = true; updateStatus(); sendSys({t:'hello-back', name:me.name}); }
+      break;
+    case 'hello-back':
+      if(m.name !== me.name){ peerOnline = true; updateStatus(); }
+      break;
+    case 'msg': addMsg(m.text, false); break;
+    case 'typing': typingState(m.on); break;
+    case 'call-offer': onIncomingCall(m); break;
+    case 'call-accept': onCallAccepted(); break;
+    case 'call-decline': onCallDeclined(); break;
+    case 'call-end': remoteEndedCall(); break;
+  }
+};
+function updateStatus(){
+  const s = $('peerStatus');
+  s.textContent = peerOnline ? 'ऑनलाइन ●' : 'ऑफलाइन';
+  s.className = peerOnline ? 'online' : '';
+}
+function typingState(on){
+  const s = $('peerStatus'), bar = $('typingBar');
+  if(on){ s.textContent='टाइप कर रहे हैं…'; s.className='typing'; bar.classList.add('active'); }
+  else { bar.classList.remove('active'); updateStatus(); }
+}
+window.addEventListener('beforeunload', ()=>{ if(localStream) endCall(true); sendSys({t:'bye'}); });
+
+// ---------- कॉलिंग ----------
+$('audioCallBtn').onclick = () => startCall(false);
+$('videoCallBtn').onclick  = () => startCall(true);
+
+function startCall(withVideo){
+  sendSys({ t:'call-offer', from:me.name, video:withVideo });
+  showCallUI(withVideo, 'कॉल जा रही है… बैल बज रही है 📳');
+}
+function onIncomingCall(m){
+  incomingCall = m;
+  $('callerName').textContent = '💜 ' + m.from;
+  $('callTypeLabel').textContent = m.video ? 'इनकमिंग वीडियो कॉल…' : 'इनकमिंग ऑडियो कॉल…';
+  $('incomingCall').classList.add('active');
+}
+$('acceptBtn').onclick = async () => {
+  $('incomingCall').classList.remove('active');
+  sendSys({ t:'call-accept' });
+  await showCallUI(incomingCall.video, 'कनेक्ट हो रहा है…');
+  startTimer();
+};
+$('declineBtn').onclick = () => {
+  $('incomingCall').classList.remove('active');
+  sendSys({ t:'call-decline' });
+  incomingCall = null;
+};
+async function onCallAccepted(){ await showCallUI(camOn, 'कनेक्ट हो रहा है…'); startTimer(); }
+function onCallDeclined(){
+  $('callOverlay').classList.remove('active');
+  alert('Partner ने कॉल अस्वीकार कर दी 💔');
+}
+function remoteEndedCall(){
+  hangup();
+  alert('Partner ने कॉल खत्म कर दी 👋');
+}
+async function showCallUI(withVideo, note){
+  $('remoteNote').textContent = note;
+  $('callOverlay').classList.add('active');
+  try{
+    localStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:withVideo });
+    if(withVideo){
+      $('localVideo').srcObject = localStream;
+      $('localVideo').style.display = 'block';
+      camBtnState(true);
+    } else { camBtnState(false); }
+  }catch(e){
+    $('remoteNote').textContent = 'माइक/कैमरा एक्सेस नहीं मिला (localhost पर HTTPS/permission चाहिए)';
+  }
+  setTimeout(()=>{ if($('callOverlay').classList.contains('active')) $('remoteNote').textContent = 'Partner कनेक्टेड है 💜 (लोकल डेमो — रिमोट वीडियो के लिए असली WebRTC सिग्नलिंग सर्वर चाहिए)'; }, 1500);
+}
+function camBtnState(on){ camOn = on; $('camBtn').classList.toggle('off', !on); }
+$('micBtn').onclick = () => {
+  if(!localStream) return;
+  micOn = !micOn;
+  localStream.getAudioTracks().forEach(t => t.enabled = micOn);
+  $('micBtn').classList.toggle('off', !micOn);
+};
+$('camBtn').onclick = () => {
+  if(!localStream) return;
+  camOn = !camOn;
+  localStream.getVideoTracks().forEach(t => t.enabled = camOn);
+  $('camBtn').classList.toggle('off', !camOn);
+  $('localVideo').style.opacity = camOn ? '1' : '.15';
+};
+$('endCall').onclick = () => { sendSys({t:'call-end'}); hangup(); };
+function hangup(){
+  $('callOverlay').classList.remove('active');
+  stopTimer();
+  if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream = null; }
+  $('localVideo').style.display = 'none';
+}
+function endCall(){ /* silent cleanup on unload */ }
+
+// ---------- कॉल टाइमर ----------
+function startTimer(){
+  callSecs = 0; stopTimer();
+  callTimerInt = setInterval(()=>{
+    callSecs++;
+    const m = String(Math.floor(callSecs/60)).padStart(2,'0');
+    const s = String(callSecs%60).padStart(2,'0');
+    $('callTimer').textContent = `🔴 LIVE ${m}:${s}`;
+  },1000);
+}
+function stopTimer(){ clearInterval(callTimerInt); $('callTimer').textContent=''; }
+
+// ---------- फ्लोटिंग हार्ट्स ----------
+function spawnHearts(){
+  const hearts = ['💜','💖','💘','💕','✨'];
+  setInterval(()=>{
+    if(!$('chatApp').classList.contains('active')) return;
+    const h = document.createElement('div');
+    h.className = 'float-heart';
+    h.textContent = hearts[Math.floor(Math.random()*hearts.length)];
+    h.style.left = Math.random()*100 + 'vw';
+    h.style.fontSize = (14 + Math.random()*18) + 'px';
+    h.style.animationDuration = (6 + Math.random()*6) + 's';
+    document.body.appendChild(h);
+    setTimeout(()=>h.remove(), 12000);
+  }, 1800);
+}
+</script>
+</body>
+</html>
